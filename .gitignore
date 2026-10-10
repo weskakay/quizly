@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual env, all the usual folder names
+.venv/
+venv/
+env/
+ENV/
+.env/
+env.bak/
+venv.bak/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# Env
+.env
+*.log
+
+# Temporary audio from quiz generation
+*.m4a
+*.mp3
+*.webm
+*.wav
+*.part
+
+# Coverage
+.coverage
+htmlcov/
+
+# OS / editor
+.DS_Store
+.vscode/

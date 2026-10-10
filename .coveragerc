@@ -1,0 +1,11 @@
+[run]
+source =
+    auth_app
+    quiz_app
+    core
+omit =
+    */migrations/*
+    */tests/*
+    core/asgi.py
+    core/wsgi.py
+    manage.py
