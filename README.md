@@ -138,6 +138,14 @@ copy .env.example .env
 
 Open `.env` and put your Gemini API key behind `GEMINI_API_KEY`.
 
+Then create a secret key, it also signs the login tokens:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(50))"
+```
+
+Put the output behind `DJANGO_SECRET_KEY` in `.env`.
+
 **7. Create the database**
 
 ```bash

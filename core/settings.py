@@ -1,6 +1,7 @@
 """Django settings for the Quizly project."""
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -132,6 +133,18 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+
+# JWT in HttpOnly cookies
+# https://django-rest-framework-simplejwt.readthedocs.io/en/latest/settings.html
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+}
+
+# Secure cookies are only sent over HTTPS, so they stay off locally.
+JWT_COOKIE_SECURE = os.environ.get('JWT_COOKIE_SECURE', 'False') == 'True'
 
 
 # CORS, so the local frontend may call this API with its cookies
