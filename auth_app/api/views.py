@@ -1,10 +1,20 @@
 from rest_framework import generics, status
-from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import NotAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
 from auth_app.api.serializers import RegistrationSerializer
-from auth_app.utils import set_token_cookie
+from auth_app.utils import (
+    blacklist_refresh_token,
+    delete_token_cookies,
+    set_token_cookie,
+)
 
 
 class RegistrationView(generics.CreateAPIView):
@@ -50,4 +60,46 @@ class LoginView(TokenObtainPairView):
         })
         for kind in ('access', 'refresh'):
             set_token_cookie(response, kind, serializer.validated_data[kind])
+        return response
+
+
+class CookieTokenRefreshView(TokenRefreshView):
+    """POST /api/token/refresh/ issues a new access cookie.
+
+    The refresh token comes from its cookie, the request body stays empty.
+    Errors end in a 401, the parent view sends the WWW-Authenticate header.
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        """Checks the refresh cookie and sets a fresh access cookie."""
+        raw_token = request.COOKIES.get('refresh_token')
+        if not raw_token:
+            raise NotAuthenticated('Refresh token is missing.')
+        serializer = self.get_serializer(data={'refresh': raw_token})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as error:
+            raise InvalidToken(error.args[0]) from error
+        response = Response({'detail': 'Token refreshed'})
+        access_token = serializer.validated_data['access']
+        set_token_cookie(response, 'access', access_token)
+        return response
+
+
+class LogoutView(APIView):
+    """POST /api/logout/ blacklists the refresh token and clears cookies."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """Logs the user out, old tokens cannot be refreshed afterwards."""
+        blacklist_refresh_token(request.COOKIES.get('refresh_token'))
+        response = Response({
+            'detail': 'Log-Out successfully! All Tokens will be deleted. '
+                      'Refresh token is now invalid.'
+        })
+        delete_token_cookies(response)
         return response

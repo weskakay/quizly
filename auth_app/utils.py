@@ -1,4 +1,6 @@
 from django.conf import settings
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 def set_token_cookie(response, kind, token):
@@ -15,3 +17,23 @@ def set_token_cookie(response, kind, token):
         secure=settings.JWT_COOKIE_SECURE,
         samesite='Lax',
     )
+
+
+def delete_token_cookies(response):
+    """Removes both JWT cookies from the browser."""
+    for kind in ('access', 'refresh'):
+        response.delete_cookie(f'{kind}_token', samesite='Lax')
+
+
+def blacklist_refresh_token(raw_token):
+    """Puts the refresh token on the blacklist so it cannot be used again.
+
+    A missing, broken or already blacklisted token has nothing left to
+    block, the logout goes on anyway.
+    """
+    if not raw_token:
+        return
+    try:
+        RefreshToken(raw_token).blacklist()
+    except TokenError:
+        pass
