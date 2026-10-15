@@ -1,9 +1,15 @@
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from quiz_app.api.permissions import IsQuizOwner
-from quiz_app.api.serializers import QuizCreateSerializer, QuizSerializer
+from quiz_app.api.serializers import (
+    CreatedQuizSerializer,
+    QuizCreateSerializer,
+    QuizSerializer,
+)
 from quiz_app.models import Quiz
+from quiz_app.services import create_quiz_from_url
 
 
 class QuizListView(generics.ListCreateAPIView):
@@ -13,23 +19,27 @@ class QuizListView(generics.ListCreateAPIView):
     the Gemini request happen before the 201.
     """
 
+    queryset = Quiz.objects.prefetch_related('questions')
+    serializer_class = QuizSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Only the own quizzes, newest first, questions in one query."""
-        return Quiz.objects.filter(
-            owner=self.request.user
-        ).prefetch_related('questions')
+        """Only the quizzes of the logged in user, newest first."""
+        return super().get_queryset().filter(owner=self.request.user)
 
-    def get_serializer_class(self):
-        """The create serializer takes a url, the list shows quizzes."""
-        if self.request.method == 'POST':
-            return QuizCreateSerializer
-        return QuizSerializer
+    def create(self, request, *args, **kwargs):
+        """Checks the link, builds the quiz and answers with it.
 
-    def perform_create(self, serializer):
-        """Stores the quiz for the logged in user."""
-        serializer.save(owner=self.request.user)
+        The request only carries a url, the answer is the full new quiz,
+        so input and output use different serializers.
+        """
+        serializer = QuizCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        url = serializer.validated_data['video_url']
+        quiz = create_quiz_from_url(request.user, url)
+        return Response(
+            CreatedQuizSerializer(quiz).data, status=status.HTTP_201_CREATED
+        )
 
 
 class QuizDetailView(generics.RetrieveUpdateDestroyAPIView):

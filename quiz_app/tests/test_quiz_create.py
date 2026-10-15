@@ -9,7 +9,7 @@ from quiz_app.models import Question, Quiz
 from quiz_app.tests.helpers import quiz_answer
 from quiz_app.utils import QuizGenerationError, VideoError
 
-PIPELINE = 'quiz_app.api.serializers.generate_quiz_data'
+PIPELINE = 'quiz_app.services.generate_quiz_data'
 
 
 class QuizCreateTests(APITestCase):
@@ -77,7 +77,7 @@ class QuizCreateTests(APITestCase):
 
     @patch(PIPELINE, side_effect=QuizGenerationError('gemini down'))
     def test_failed_generation_returns_500_without_details(self, pipeline):
-        with self.assertLogs('quiz_app.api.serializers', level='ERROR'):
+        with self.assertLogs('quiz_app.services', level='ERROR'):
             response = self.post()
         self.assertEqual(
             response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR

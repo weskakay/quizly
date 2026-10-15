@@ -1,26 +1,7 @@
-import logging
-
-from django.db import transaction
 from rest_framework import serializers
-from rest_framework.exceptions import APIException
 
 from quiz_app.models import Question, Quiz
-from quiz_app.utils import (
-    QuizGenerationError,
-    VideoError,
-    generate_quiz_data,
-    normalize_youtube_url,
-)
-
-logger = logging.getLogger(__name__)
-
-
-class QuizGenerationFailed(APIException):
-    """500 with a general message, details only go to the log."""
-
-    status_code = 500
-    default_detail = 'Quiz could not be generated.'
-    default_code = 'quiz_generation_failed'
+from quiz_app.utils import VideoError, normalize_youtube_url
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -58,10 +39,14 @@ class CreatedQuizSerializer(QuizSerializer):
     questions = CreatedQuestionSerializer(many=True, read_only=True)
 
 
-class QuizCreateSerializer(serializers.Serializer):
-    """Takes a YouTube link and builds a quiz with 10 questions from it."""
+class QuizCreateSerializer(serializers.ModelSerializer):
+    """Checks the YouTube link a new quiz is built from."""
 
-    url = serializers.CharField()
+    url = serializers.CharField(source='video_url')
+
+    class Meta:
+        model = Quiz
+        fields = ['url']
 
     def validate_url(self, value):
         """Rejects anything that is not a YouTube video before downloading."""
@@ -69,38 +54,3 @@ class QuizCreateSerializer(serializers.Serializer):
             return normalize_youtube_url(value)
         except VideoError as error:
             raise serializers.ValidationError(str(error)) from error
-
-    def create(self, validated_data):
-        """Runs the pipeline and stores the quiz with its questions."""
-        url = validated_data['url']
-        quiz_data = self._generate(url)
-        return self._store(validated_data['owner'], url, quiz_data)
-
-    def _generate(self, url):
-        """Maps pipeline errors: the video's fault 400, ours 500."""
-        try:
-            return generate_quiz_data(url)
-        except VideoError as error:
-            raise serializers.ValidationError({'url': [str(error)]}) from error
-        except QuizGenerationError as error:
-            logger.error('Quiz generation failed: %s', error, exc_info=True)
-            raise QuizGenerationFailed() from error
-
-    def _store(self, owner, url, quiz_data):
-        """Saves quiz and questions together or not at all."""
-        with transaction.atomic():
-            quiz = Quiz.objects.create(
-                owner=owner,
-                title=quiz_data['title'],
-                description=quiz_data['description'],
-                video_url=url,
-            )
-            Question.objects.bulk_create(
-                Question(quiz=quiz, **question)
-                for question in quiz_data['questions']
-            )
-        return quiz
-
-    def to_representation(self, instance):
-        """Answers with the full quiz instead of the posted url."""
-        return CreatedQuizSerializer(instance).data
