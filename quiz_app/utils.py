@@ -1,7 +1,7 @@
 import json
+import logging
 import re
 import tempfile
-from functools import lru_cache
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -13,11 +13,16 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 
+logger = logging.getLogger(__name__)
+
 YOUTUBE_HOSTS = {
     'youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com',
     'youtu.be', 'www.youtu.be',
 }
 VIDEO_ID = re.compile(r'[A-Za-z0-9_-]{11}')
+QUESTION_COUNT = 10
+OPTION_COUNT = 4
+INVALID_QUESTION = 'Gemini returned an invalid question.'
 GEMINI_TIMEOUT_MS = 60_000
 GEMINI_CONFIG = types.GenerateContentConfig(
     response_mime_type='application/json'
@@ -127,16 +132,11 @@ def download_audio(url, folder):
         raise VideoError('Video could not be loaded.') from error
 
 
-@lru_cache(maxsize=1)
-def load_whisper_model():
-    """Loads the Whisper model once and keeps it for later requests."""
-    return whisper.load_model(settings.WHISPER_MODEL)
-
-
 def transcribe_audio(path):
     """Turns the audio file into text with Whisper, locally."""
     try:
-        result = load_whisper_model().transcribe(path, fp16=False)
+        model = whisper.load_model(settings.WHISPER_MODEL)
+        result = model.transcribe(path, fp16=False)
     except (RuntimeError, OSError) as error:
         raise QuizGenerationError('Transcription failed.') from error
     text = result['text'].strip()
@@ -177,10 +177,10 @@ def strip_code_fences(text):
 def clean_question(question):
     """Trims all texts so the answer matches its option exactly."""
     if not isinstance(question, dict):
-        raise QuizGenerationError('Gemini returned an invalid question.')
+        raise QuizGenerationError(INVALID_QUESTION)
     options = question.get('question_options')
     if not isinstance(options, list):
-        raise QuizGenerationError('Gemini returned an invalid question.')
+        raise QuizGenerationError(INVALID_QUESTION)
     return {
         'question_title': str(question.get('question_title', '')).strip(),
         'question_options': [str(option).strip() for option in options],
@@ -188,15 +188,26 @@ def clean_question(question):
     }
 
 
+def options_are_valid(options, answer):
+    """Four filled, different options and the answer is one of them.
+
+    Used for Gemini answers and for questions edited in the admin.
+    """
+    if not isinstance(options, list) or len(options) != OPTION_COUNT:
+        return False
+    texts = [str(option) for option in options]
+    if not all(texts) or len(set(texts)) != OPTION_COUNT:
+        return False
+    return answer in options
+
+
 def validate_question(question):
-    """Checks for a title, four distinct filled options, answer among them."""
-    options = question['question_options']
-    if not question['question_title'] or not all(options):
-        raise QuizGenerationError('Gemini returned an invalid question.')
-    if len(options) != 4 or len(set(options)) != 4:
-        raise QuizGenerationError('Gemini returned an invalid question.')
-    if question['answer'] not in options:
-        raise QuizGenerationError('Gemini returned an invalid question.')
+    """Checks that a question has a title and playable options."""
+    if not question['question_title']:
+        raise QuizGenerationError(INVALID_QUESTION)
+    if not options_are_valid(question['question_options'],
+                             question['answer']):
+        raise QuizGenerationError(INVALID_QUESTION)
 
 
 def load_quiz_json(text):
@@ -215,12 +226,13 @@ def parse_quiz(text):
     """Turns the Gemini answer into title, description and 10 questions."""
     data = load_quiz_json(text)
     questions = [clean_question(question) for question in data['questions']]
-    if len(questions) != 10 or not str(data.get('title', '')).strip():
+    title = str(data.get('title', '')).strip()
+    if len(questions) != QUESTION_COUNT or not title:
         raise QuizGenerationError('Gemini returned an invalid quiz.')
     for question in questions:
         validate_question(question)
     return {
-        'title': str(data['title']).strip()[:255],
+        'title': title[:255],
         'description': str(data.get('description', '')).strip(),
         'questions': questions,
     }
@@ -232,13 +244,14 @@ def ask_gemini_for_quiz(prompt):
     Free Gemini models are often overloaded (503), the next one usually
     answers.
     """
-    error = QuizGenerationError('No Gemini model configured.')
+    last_error = None
     for model in settings.GEMINI_MODELS:
         try:
             return parse_quiz(request_quiz_text(prompt, model))
-        except QuizGenerationError as model_error:
-            error = model_error
-    raise error
+        except QuizGenerationError as error:
+            logger.warning('Gemini model %s failed: %s', model, error)
+            last_error = error
+    raise last_error or QuizGenerationError('No Gemini model configured.')
 
 
 def generate_quiz_data(url):

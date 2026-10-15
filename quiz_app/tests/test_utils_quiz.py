@@ -88,14 +88,17 @@ class AskGeminiTests(SimpleTestCase):
         request.side_effect = [
             QuizGenerationError('overloaded'), json.dumps(quiz_answer()),
         ]
-        self.assertEqual(ask_gemini_for_quiz('prompt')['title'], 'Elephants')
+        with self.assertLogs('quiz_app.utils', level='WARNING'):
+            quiz = ask_gemini_for_quiz('prompt')
+        self.assertEqual(quiz['title'], 'Elephants')
         self.assertEqual(request.call_args.args, ('prompt', 'second'))
 
     @patch('quiz_app.utils.request_quiz_text')
     def test_error_when_all_models_fail(self, request):
         request.return_value = 'not json'
-        with self.assertRaises(QuizGenerationError):
-            ask_gemini_for_quiz('prompt')
+        with self.assertLogs('quiz_app.utils', level='WARNING'):
+            with self.assertRaises(QuizGenerationError):
+                ask_gemini_for_quiz('prompt')
         self.assertEqual(request.call_count, 2)
 
     @override_settings(GEMINI_MODELS=[])

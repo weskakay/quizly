@@ -73,10 +73,20 @@ class QuizCreateSerializer(serializers.Serializer):
     def create(self, validated_data):
         """Runs the pipeline and stores the quiz with its questions."""
         url = validated_data['url']
-        quiz_data = self.generate(url)
-        return self.store(validated_data['owner'], url, quiz_data)
+        quiz_data = self._generate(url)
+        return self._store(validated_data['owner'], url, quiz_data)
 
-    def store(self, owner, url, quiz_data):
+    def _generate(self, url):
+        """Maps pipeline errors: the video's fault 400, ours 500."""
+        try:
+            return generate_quiz_data(url)
+        except VideoError as error:
+            raise serializers.ValidationError({'url': [str(error)]}) from error
+        except QuizGenerationError as error:
+            logger.error('Quiz generation failed: %s', error, exc_info=True)
+            raise QuizGenerationFailed() from error
+
+    def _store(self, owner, url, quiz_data):
         """Saves quiz and questions together or not at all."""
         with transaction.atomic():
             quiz = Quiz.objects.create(
@@ -90,16 +100,6 @@ class QuizCreateSerializer(serializers.Serializer):
                 for question in quiz_data['questions']
             )
         return quiz
-
-    def generate(self, url):
-        """Maps pipeline errors: the video's fault 400, ours 500."""
-        try:
-            return generate_quiz_data(url)
-        except VideoError as error:
-            raise serializers.ValidationError({'url': [str(error)]}) from error
-        except QuizGenerationError as error:
-            logger.error('Quiz generation failed: %s', error, exc_info=True)
-            raise QuizGenerationFailed() from error
 
     def to_representation(self, instance):
         """Answers with the full quiz instead of the posted url."""

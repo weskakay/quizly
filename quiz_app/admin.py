@@ -2,6 +2,7 @@ from django import forms
 from django.contrib import admin
 
 from quiz_app.models import Question, Quiz
+from quiz_app.utils import options_are_valid
 
 
 class QuestionAdminForm(forms.ModelForm):
@@ -15,12 +16,11 @@ class QuestionAdminForm(forms.ModelForm):
         """Rejects option lists the frontend cannot show."""
         data = super().clean()
         options = data.get('question_options')
-        if not isinstance(options, list) or len(options) != 4:
-            raise forms.ValidationError('Exactly four options are needed.')
-        if len({str(option) for option in options}) != 4:
-            raise forms.ValidationError('The four options must differ.')
-        if data.get('answer') not in options:
-            raise forms.ValidationError('The answer must be one option.')
+        if not options_are_valid(options, data.get('answer')):
+            raise forms.ValidationError(
+                'Four different options are needed, the answer must be one '
+                'of them.'
+            )
         return data
 
 

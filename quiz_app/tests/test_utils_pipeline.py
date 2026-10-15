@@ -14,7 +14,6 @@ from quiz_app.utils import (
     download_audio,
     fetch_video_info,
     generate_quiz_data,
-    load_whisper_model,
     request_quiz_text,
     transcribe_audio,
     ydl_options,
@@ -77,18 +76,18 @@ class VideoTests(SimpleTestCase):
 class TranscriptionTests(SimpleTestCase):
     """Covers the Whisper step."""
 
-    @patch('quiz_app.utils.load_whisper_model')
+    @patch('quiz_app.utils.whisper.load_model')
     def test_text_is_returned_trimmed(self, load):
         load.return_value.transcribe.return_value = {'text': ' Hello '}
         self.assertEqual(transcribe_audio('a.webm'), 'Hello')
 
-    @patch('quiz_app.utils.load_whisper_model')
+    @patch('quiz_app.utils.whisper.load_model')
     def test_silent_video_raises_video_error(self, load):
         load.return_value.transcribe.return_value = {'text': '  '}
         with self.assertRaises(VideoError):
             transcribe_audio('a.webm')
 
-    @patch('quiz_app.utils.load_whisper_model')
+    @patch('quiz_app.utils.whisper.load_model')
     def test_missing_ffmpeg_raises_generation_error(self, load):
         load.return_value.transcribe.side_effect = FileNotFoundError('ffmpeg')
         with self.assertRaises(QuizGenerationError):
@@ -96,12 +95,10 @@ class TranscriptionTests(SimpleTestCase):
 
     @override_settings(WHISPER_MODEL='tiny')
     @patch('quiz_app.utils.whisper.load_model')
-    def test_whisper_model_is_loaded_once(self, load_model):
-        load_whisper_model.cache_clear()
-        load_whisper_model()
-        load_whisper_model()
+    def test_configured_whisper_model_is_used(self, load_model):
+        load_model.return_value.transcribe.return_value = {'text': 'Hi'}
+        transcribe_audio('a.webm')
         load_model.assert_called_once_with('tiny')
-        load_whisper_model.cache_clear()
 
 
 class GeminiRequestTests(SimpleTestCase):
