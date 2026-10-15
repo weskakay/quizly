@@ -90,8 +90,7 @@ DATABASES = {
 
 
 # Password validation
-# Used by createsuperuser and the admin. Registration does not apply them,
-# see the README.
+# Used by registration, createsuperuser and the admin.
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 _pw = 'django.contrib.auth.password_validation'

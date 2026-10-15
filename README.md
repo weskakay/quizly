@@ -193,8 +193,8 @@ python -m http.server 5501
 
 Open `http://127.0.0.1:5501`, not `localhost`, otherwise the browser does not
 send the login cookies to the API. There are no guest accounts, register a
-user first. The frontend itself asks for a password with a lowercase and an
-uppercase letter, a digit and at least six characters.
+user first with a strong password such as `Quizly-Test-2026`, see
+[Authentication](#authentication).
 
 ## Authentication
 
@@ -226,8 +226,9 @@ PUT on a quiz, return 405.
 
 Registration takes `username`, `email`, `password` and `confirmed_password`.
 Usernames and email addresses must be unique, the email check ignores case.
-Wrong login data returns the same general message for an unknown user and a
-wrong password.
+The password goes through Django's password validators: at least eight
+characters, not a common password and not only digits. Wrong login data
+returns the same general message for an unknown user and a wrong password.
 
 ### Quizzes
 
@@ -279,18 +280,21 @@ fields are ignored. Deleting a quiz deletes its questions.
 - **403 for quizzes of other users.** The specification asks for 403. The
   frontend treats 403 like an expired login and moves to the login page,
   this is frontend behaviour.
-- **No password rules on registration.** The API checks that both passwords
-  match and that username and email are free. The frontend has its own
-  password rule. On a failed registration the frontend only shows the
-  `username` error, other field errors such as a taken email appear there as
-  "undefined", the API response itself names the field.
+- **Password rules in the backend.** The frontend has its own, weaker rule
+  (six characters with upper and lower case letters and a digit). The API
+  applies Django's validators on top, so a password like `Secret123` passes
+  the frontend but is rejected as too common. On a failed registration the
+  frontend only shows the `username` error, other field errors such as a
+  weak password or a taken email appear there as "undefined", the API
+  response itself names the field.
 
 ## Project layout
 
 ```
 core/       project settings and root urls
 auth_app/   registration, login, logout, token refresh, cookie authentication
-quiz_app/   quizzes, questions and the pipeline in utils.py
+quiz_app/   quizzes and questions, services.py builds and stores a quiz,
+            utils.py holds the pipeline steps (YouTube, Whisper, Gemini)
 ```
 
 Each app keeps its API code in an `api/` folder and its tests in a `tests/`
