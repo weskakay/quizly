@@ -1,4 +1,4 @@
-from rest_framework import generics, status
+from rest_framework import generics
 from rest_framework.exceptions import NotAuthenticated
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -13,7 +13,8 @@ from auth_app.api.serializers import RegistrationSerializer
 from auth_app.utils import (
     blacklist_refresh_token,
     delete_token_cookies,
-    set_token_cookie,
+    set_access_cookie,
+    set_refresh_cookie,
 )
 
 
@@ -27,16 +28,6 @@ class RegistrationView(generics.CreateAPIView):
     authentication_classes = []
     permission_classes = [AllowAny]
     serializer_class = RegistrationSerializer
-
-    def create(self, request, *args, **kwargs):
-        """Saves the user and answers with a short confirmation."""
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            {'detail': 'User created successfully!'},
-            status=status.HTTP_201_CREATED,
-        )
 
 
 class LoginView(TokenObtainPairView):
@@ -58,8 +49,8 @@ class LoginView(TokenObtainPairView):
             'user': {'id': user.id, 'username': user.username,
                      'email': user.email},
         })
-        for kind in ('access', 'refresh'):
-            set_token_cookie(response, kind, serializer.validated_data[kind])
+        set_access_cookie(response, serializer.validated_data['access'])
+        set_refresh_cookie(response, serializer.validated_data['refresh'])
         return response
 
 
@@ -84,8 +75,7 @@ class CookieTokenRefreshView(TokenRefreshView):
         except TokenError as error:
             raise InvalidToken(error.args[0]) from error
         response = Response({'detail': 'Token refreshed'})
-        access_token = serializer.validated_data['access']
-        set_token_cookie(response, 'access', access_token)
+        set_access_cookie(response, serializer.validated_data['access'])
         return response
 
 
