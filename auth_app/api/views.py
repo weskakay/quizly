@@ -1,9 +1,14 @@
+from django.contrib.auth.models import User
 from rest_framework import generics
 from rest_framework.exceptions import NotAuthenticated
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.serializers import (
+    TokenObtainPairSerializer,
+    TokenRefreshSerializer,
+)
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -27,6 +32,7 @@ class RegistrationView(generics.CreateAPIView):
 
     authentication_classes = []
     permission_classes = [AllowAny]
+    queryset = User.objects.all()
     serializer_class = RegistrationSerializer
 
 
@@ -38,6 +44,7 @@ class LoginView(TokenObtainPairView):
 
     authentication_classes = []
     permission_classes = [AllowAny]
+    serializer_class = TokenObtainPairSerializer
 
     def post(self, request, *args, **kwargs):
         """Logs the user in and stores the tokens in HttpOnly cookies."""
@@ -63,6 +70,7 @@ class CookieTokenRefreshView(TokenRefreshView):
 
     authentication_classes = []
     permission_classes = [AllowAny]
+    serializer_class = TokenRefreshSerializer
 
     def post(self, request, *args, **kwargs):
         """Checks the refresh cookie and sets a fresh access cookie."""
