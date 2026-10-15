@@ -69,6 +69,11 @@ class QuizDetailTests(APITestCase):
             self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertTrue(Quiz.objects.filter(id=self.quiz.id).exists())
 
+    def test_other_user_with_invalid_body_gets_403_before_400(self):
+        self.client.force_authenticate(self.other)
+        response = self.client.patch(self.url, {'title': ''}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_without_login_returns_401(self):
         self.client.force_authenticate(None)
         for method in ('get', 'patch', 'delete'):

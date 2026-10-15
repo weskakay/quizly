@@ -5,7 +5,7 @@ from quiz_app.models import Question, Quiz
 
 
 class QuestionAdminForm(forms.ModelForm):
-    """Keeps edited questions playable: four options, answer among them."""
+    """Keeps edited questions playable: four different options, one answer."""
 
     class Meta:
         model = Question
@@ -17,6 +17,8 @@ class QuestionAdminForm(forms.ModelForm):
         options = data.get('question_options')
         if not isinstance(options, list) or len(options) != 4:
             raise forms.ValidationError('Exactly four options are needed.')
+        if len({str(option) for option in options}) != 4:
+            raise forms.ValidationError('The four options must differ.')
         if data.get('answer') not in options:
             raise forms.ValidationError('The answer must be one option.')
         return data
