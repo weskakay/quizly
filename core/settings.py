@@ -163,3 +163,18 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
+
+
+# Quiz generation: Whisper runs locally, Gemini needs an API key
+# https://ai.google.dev/gemini-api/docs
+
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+# Tried in this order, the next one steps in when a model is overloaded.
+GEMINI_MODELS = [
+    model.strip() for model in os.environ.get(
+        'GEMINI_MODELS',
+        'gemini-3.8-flash,gemini-3.5-flash,gemini-flash-lite-latest',
+    ).split(',') if model.strip()
+]
+WHISPER_MODEL = os.environ.get('WHISPER_MODEL', 'base')
+MAX_VIDEO_MINUTES = int(os.environ.get('MAX_VIDEO_MINUTES', '20'))

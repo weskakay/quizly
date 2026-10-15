@@ -177,7 +177,7 @@ All settings are read from `.env`, see `.env.example`.
 | `DJANGO_ALLOWED_HOSTS` | `127.0.0.1,localhost` | Comma separated host names |
 | `JWT_COOKIE_SECURE` | `False` | `True` when the API runs behind HTTPS |
 | `GEMINI_API_KEY` | none | Required to generate quizzes |
-| `GEMINI_MODEL` | see `.env.example` | Gemini model used for the questions |
+| `GEMINI_MODELS` | see `.env.example` | Gemini models, tried in order when one is overloaded |
 | `WHISPER_MODEL` | `base` | Whisper model size, larger is slower but more exact |
 | `MAX_VIDEO_MINUTES` | `20` | Longer videos are rejected |
 
